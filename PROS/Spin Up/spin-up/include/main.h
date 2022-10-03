@@ -1,3 +1,5 @@
+#include "pros/apix.h"
+
 /**
  * \file main.h
  *
