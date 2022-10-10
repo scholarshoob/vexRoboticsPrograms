@@ -1,18 +1,12 @@
 #include "main.h"
 #include "api.h"
 #include "display/lv_core/lv_obj.h"
-#include "display/lv_misc/lv_symbol_def.h"
-#include "display/lv_objx/lv_btn.h"
-#include "display/lv_objx/lv_btnm.h"
-#include "display/lv_objx/lv_ddlist.h"
-#include "display/lv_objx/lv_label.h"
-#include "display/lv_objx/lv_page.h"
-#include "display/lv_objx/lv_roller.h"
 #include "display/lv_themes/lv_theme.h"
 #include "display/lv_themes/lv_theme_night.h"
 #include "display/lvgl.h"
 #include "pros/apix.h"
 #include "pros/misc.h"
+#include "pros/motors.h"
 #include "pros/motors.hpp"
 #include "robotConfig.h"
 #include <cstddef>
@@ -66,55 +60,65 @@ void setMotorGroupPort(Motor_Group *&motor_group, std::vector<int8_t> ports) {
 }
 
 void init() {
-  lv_theme_t *theme = lv_theme_material_init(240, NULL);
-  lv_theme_set_current(theme);
 
-  lv_obj_t *screen = lv_obj_create(NULL, NULL);
-  lv_scr_load(screen);
+  lv_obj_clean(lv_scr_act());
 
   // Title Page
   lv_obj_t *titleLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(titleLabel, "Port Mapping: (Tap to Change)");
+  lv_label_set_text(titleLabel, "Port Mappings");
   lv_obj_align(titleLabel, lv_scr_act(), LV_ALIGN_IN_TOP_MID, 0, 10);
 
   // Port Labels
   lv_obj_t *leftDrivePortLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(leftDrivePortLabel, "1, 2, 3");
-  lv_obj_align(leftDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, 0, -50);
+  lv_label_set_text(leftDrivePortLabel, "| 1 | 2 | 3 |");
+  lv_obj_align(leftDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, -20,
+               -50);
 
   lv_obj_t *rightDrivePortLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(rightDrivePortLabel, "8, 9, 10");
-  lv_obj_align(rightDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, 0, 0);
+  lv_label_set_text(rightDrivePortLabel, "| 8 | 9 | 10 |");
+  lv_obj_align(rightDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, -20,
+               0);
 
   lv_obj_t *flywheelPortLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(flywheelPortLabel, "5");
-  lv_obj_align(flywheelPortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, 0, 50);
+  lv_label_set_text(flywheelPortLabel, "| 5 |");
+  lv_obj_align(flywheelPortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, -20, 50);
 
   lv_obj_t *intakePortLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(intakePortLabel, "6");
-  lv_obj_align(intakePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, 0, 100);
+  lv_label_set_text(intakePortLabel, "| 6 |");
+  lv_obj_align(intakePortLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, -20, 100);
 
   // Port Labels
   lv_obj_t *leftDriveLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(leftDrivePortLabel, "Left Drive: ");
-  lv_obj_align(leftDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, -50);
+  lv_label_set_text(leftDriveLabel, "Left Drive: ");
+  lv_obj_align(leftDriveLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, -50);
 
   lv_obj_t *rightDriveLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(rightDrivePortLabel, "Right Drive: ");
-  lv_obj_align(rightDrivePortLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 0);
+  lv_label_set_text(rightDriveLabel, "Right Drive: ");
+  lv_obj_align(rightDriveLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 0);
 
   lv_obj_t *flywheelLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(flywheelPortLabel, "Flywheel: ");
-  lv_obj_align(flywheelPortLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 50);
+  lv_label_set_text(flywheelLabel, "Flywheel: ");
+  lv_obj_align(flywheelLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 50);
 
   lv_obj_t *intakeLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(intakePortLabel, "Intake: ");
-  lv_obj_align(intakePortLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 100);
+  lv_label_set_text(intakeLabel, "Intake: ");
+  lv_obj_align(intakeLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 100);
 }
 
 void initialize() {
   init();
-  setMotorPort(flywheelMotor, 3);
+
+  setMotorGroupPort(leftDrive, leftDrivePorts);
+  leftDrive->set_brake_modes(E_MOTOR_BRAKE_HOLD);
+
+  setMotorGroupPort(rightDrive, rightDrivePorts);
+  rightDrive->set_brake_modes(E_MOTOR_BRAKE_HOLD);
+
+  setMotorPort(flywheelMotor, 5);
+  flywheelMotor->set_brake_mode(E_MOTOR_BRAKE_COAST);
+
+  setMotorPort(intakeMotor, 6);
+  intakeMotor->set_brake_mode(E_MOTOR_BRAKE_HOLD);
 }
 /**
  * Runs while the robot is in the disabled state of Field Management System or
@@ -161,7 +165,23 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
+  // Constantly repeat controller inputs
   while (true) {
+
+    // Drive Control
+    leftDrive->move(controller.get_analog(E_CONTROLLER_ANALOG_LEFT_Y));
+    rightDrive->move(controller.get_analog(E_CONTROLLER_ANALOG_RIGHT_Y));
+
+    // Intake Control
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_R1)) {
+      intakeMotor->move(127);
+    } else if (controller.get_digital(E_CONTROLLER_DIGITAL_R2)) {
+      intakeMotor->move(-127);
+    } else {
+      intakeMotor->brake();
+    }
+
+    // Flywheel Control
     if (controller.get_digital(E_CONTROLLER_DIGITAL_L1)) {
       flywheelMotor->move(127);
     } else if (controller.get_digital(E_CONTROLLER_DIGITAL_L2)) {
