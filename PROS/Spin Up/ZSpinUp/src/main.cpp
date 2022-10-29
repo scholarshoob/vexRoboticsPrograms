@@ -12,11 +12,6 @@ Controller controller(E_CONTROLLER_MASTER);
 void displayScreenText() {
   lv_obj_clean(lv_scr_act());
 
-  // Title Page
-  lv_obj_t *titleLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(titleLabel, "Port Mappings");
-  lv_obj_align(titleLabel, lv_scr_act(), LV_ALIGN_IN_TOP_MID, 0, 10);
-
   // Port Labels
   lv_obj_t *leftDrivePortLabel = lv_label_create(lv_scr_act(), NULL);
   lv_label_set_text(leftDrivePortLabel, "| 1 | 2 | 3 |");
@@ -43,11 +38,11 @@ void displayScreenText() {
 
   // Port Labels
   lv_obj_t *leftDriveLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(leftDriveLabel, "Left Drive (F, M, B): ");
+  lv_label_set_text(leftDriveLabel, "Left Drive (F, M, B) : ");
   lv_obj_align(leftDriveLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, -100);
 
   lv_obj_t *rightDriveLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(rightDriveLabel, "Right Drive (F, M, B): ");
+  lv_label_set_text(rightDriveLabel, "Right Drive (F, M, B) : ");
   lv_obj_align(rightDriveLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, -50);
 
   lv_obj_t *flywheelLabel = lv_label_create(lv_scr_act(), NULL);
@@ -59,8 +54,8 @@ void displayScreenText() {
   lv_obj_align(intakeLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 50);
 
   lv_obj_t *pneumaticsLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(pneumaticsLabel, "Pneumatics[3-Wire] (Sequencer, Latch): ");
-  lv_obj_align(pneumaticsLabel, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, -20, 100);
+  lv_label_set_text(pneumaticsLabel, "Pneumatics[3-Wire] (Sequencer, Latch) : ");
+  lv_obj_align(pneumaticsLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 100);
 }
 
 /**
@@ -137,6 +132,7 @@ void opcontrol() {
   Motor lDriveM(2);
   Motor lDriveB(3);
   Motor_Group lDrive({lDriveF, lDriveM, lDriveB});
+  lDrive.set_reversed(true);
 
   // Right Drive
   Motor rDriveF(8);
