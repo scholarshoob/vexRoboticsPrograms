@@ -108,8 +108,10 @@ void init() {
 void initialize() {
   init();
 
+  
   setMotorGroupPort(leftDrive, leftDrivePorts);
   leftDrive->set_brake_modes(E_MOTOR_BRAKE_HOLD);
+  leftDrive->set_reversed(true);
 
   setMotorGroupPort(rightDrive, rightDrivePorts);
   rightDrive->set_brake_modes(E_MOTOR_BRAKE_HOLD);

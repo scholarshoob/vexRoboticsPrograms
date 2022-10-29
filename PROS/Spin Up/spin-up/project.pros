@@ -309,7 +309,9 @@
     },
     "upload_options": {
       "icon": "clawbot",
-      "description": "Ballistic Seals Spin Up Test Program"
+      "description": "Ballistic Seals Spin Up Test Program",
+      "slot": 2,
+      "after": "run"
     }
   }
 }
