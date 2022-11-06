@@ -54,7 +54,8 @@ void displayScreenText() {
   lv_obj_align(intakeLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 50);
 
   lv_obj_t *pneumaticsLabel = lv_label_create(lv_scr_act(), NULL);
-  lv_label_set_text(pneumaticsLabel, "Pneumatics[3-Wire] (Sequencer, Latch) : ");
+  lv_label_set_text(pneumaticsLabel,
+                    "Pneumatics[3-Wire] (Sequencer, Latch) : ");
   lv_obj_align(pneumaticsLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 100);
 }
 
@@ -142,6 +143,8 @@ void opcontrol() {
 
   // Feature Motors
   Motor flywheel(5);
+  bool flywheelOn = false;
+  flywheel.set_brake_mode(E_MOTOR_BRAKE_COAST);
   Motor intake(6);
 
   // Constantly repeat controller inputs
@@ -159,18 +162,28 @@ void opcontrol() {
       intake.brake();
     }
 
-    // Flywheel Control
-    if (controller.get_digital(E_CONTROLLER_DIGITAL_L1)) {
+    if (controller.get_digital_new_press(E_CONTROLLER_DIGITAL_L1)) {
+      if (flywheelOn == false) {
+        flywheelOn = true;
+      } else if (flywheelOn == true) {
+        flywheelOn = false;
+      }
+    }
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_UP)) {
+      flywheelOn = false;
       flywheel.move(127);
-    } else if (controller.get_digital(E_CONTROLLER_DIGITAL_L2)) {
+    }
+    // Emergency Flywheel Reverse
+    if (flywheelOn == true) {
       flywheel.move(-127);
-    } else {
+    } else if (flywheelOn == false && controller.get_digital(E_CONTROLLER_DIGITAL_UP) == false) {
       flywheel.brake();
     }
 
     // Activate Sequencer
-    if (controller.get_digital(E_CONTROLLER_DIGITAL_X)) {
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_L2)) {
       triggerSequencer();
+      delay(200);
     }
 
     // Trigger End-Of-Match Release
