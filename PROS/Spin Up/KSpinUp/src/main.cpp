@@ -3,7 +3,9 @@
 #include "display/lvgl.h"
 #include "pros/adi.h"
 #include "pros/misc.h"
+#include "pros/motors.h"
 #include "pros/motors.hpp"
+#include <iostream>
 
 using namespace pros;
 
@@ -59,6 +61,60 @@ void displayScreenText() {
   lv_obj_align(pneumaticsLabel, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 15, 100);
 }
 
+void robotMove(double rAmt, double lAmt, float speed) {
+  // Left Drive
+  Motor lDriveF(1);
+  Motor lDriveM(2);
+  Motor lDriveB(3);
+  Motor_Group lDrive({lDriveF, lDriveM, lDriveB});
+  lDrive.set_reversed(true);
+  lDrive.set_brake_modes(E_MOTOR_BRAKE_HOLD);
+
+  // Right Drive
+  Motor rDriveF(8);
+  Motor rDriveM(9);
+  Motor rDriveB(10);
+  Motor_Group rDrive({rDriveF, rDriveM, rDriveB});
+  lDrive.set_brake_modes(E_MOTOR_BRAKE_HOLD);
+
+  // what is delay time sec for?  delaying what and where ?
+  float delayTimeSec;
+  // why are we calculating this?
+  float speedInRPS = speed / 60;
+
+
+  if (rAmt < lAmt) {
+    delayTimeSec = lAmt / speedInRPS;
+  } else {
+    delayTimeSec = rAmt / speedInRPS;
+  }
+  // couldn't you use delayTimeMilliSeconds?
+  int delayTime = delayTimeSec * 1000;
+  std::cout << delayTime << std::endl;
+  rDrive.move(speed);
+  lDrive.move(speed);
+  // why times 0.75?  to leave time for slowing down?
+  delay(delayTime * 0.75);
+
+  // what is dividing by 12?  to get 1/4 increments?
+  double rRemainingDistDecrementAmt = rAmt / 12;
+  double lRemainingDistDecrementAmt = lAmt / 12;
+  float delayTimeDecrement = delayTime / 12;
+  std::cout << delayTimeDecrement << std::endl;
+  rDrive.move(speed * 3 / 4);
+  lDrive.move(speed * 3 / 4);
+  delay(delayTimeDecrement);
+
+  rDrive.move(speed * 2 / 4);
+  lDrive.move(speed * 2 / 4);
+  delay(delayTimeDecrement);
+
+  rDrive.move(speed * 1 / 4);
+  lDrive.move(speed * 1 / 4);
+  delay(delayTimeDecrement);
+  rDrive.brake();
+  lDrive.brake();
+}
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
@@ -66,6 +122,12 @@ void displayScreenText() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
+  static char latch = 'G';
+  static char sequencer = 'H';
+  pros::c::adi_pin_mode(latch, OUTPUT);
+  pros::c::adi_pin_mode(sequencer, OUTPUT);
+  pros::c::adi_digital_write(latch, false);
+  pros::c::adi_digital_write(sequencer, false);
   displayScreenText();
 }
 
@@ -88,7 +150,7 @@ void disabled() {}
 void competition_initialize() {}
 
 void triggerLatch() {
-  static char latch = 'B';
+  static char latch = 'G';
   pros::c::adi_pin_mode(latch, OUTPUT);
   pros::c::adi_digital_write(latch, true);
 }
@@ -111,7 +173,47 @@ void triggerSequencer() {
  * will be stopped. Re-enabling the robot will restart the task, not re-start
  * it from where it left off.
  */
-void autonomous() {}
+void autonomous() {
+
+  // Feature Motors
+  Motor flywheel(5);
+  Motor intake(6);
+  /*
+  flywheel.move_velocity(-600);
+  delay(3000);
+  triggerSequencer();
+  delay(1500);
+  triggerSequencer();
+  delay(500);
+  flywheel.brake();
+  delay(50);
+  */
+  Motor lDriveF(1);
+  Motor lDriveM(2);
+  Motor lDriveB(3);
+  Motor_Group lDrive({lDriveF, lDriveM, lDriveB});
+  lDrive.set_reversed(true);
+  lDrive.set_brake_modes(E_MOTOR_BRAKE_COAST);
+
+  // Right Drive
+  Motor rDriveF(8);
+  Motor rDriveM(9);
+  Motor rDriveB(10);
+  Motor_Group rDrive({rDriveF, rDriveM, rDriveB});
+  rDrive.set_brake_modes(E_MOTOR_BRAKE_COAST);
+
+  robotMove(1000, 1000, 600);
+  delay(3000);
+  /*
+  delay(3000);
+  robotMove(-500, 500, 600);
+  delay(3000);
+  robotMove(-1100, -1100, 600);
+  delay(3000);
+  robotMove(0, -650, 300);
+  delay(3000);
+  */
+}
 
 /**
  * Runs the operator control code. This function will be started in its own
@@ -192,6 +294,11 @@ void opcontrol() {
     // Trigger End-Of-Match Release
     if (controller.get_digital(E_CONTROLLER_DIGITAL_DOWN)) {
       triggerLatch();
+    }
+
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_RIGHT)) {
+      autonomous();
+      delay(200);
     }
 
     delay(20);
