@@ -2,12 +2,29 @@
 #include "api.h"
 #include "display/lvgl.h"
 #include "pros/adi.h"
+#include "pros/llemu.hpp"
 #include "pros/misc.h"
+#include "pros/motors.h"
 #include "pros/motors.hpp"
+#include <cmath>
 
 using namespace pros;
 
 Controller controller(E_CONTROLLER_MASTER);
+
+// Left Drive
+Motor lDriveF(1);
+Motor lDriveM(2);
+Motor lDriveB(3);
+Motor_Group lDrive({lDriveF, lDriveM, lDriveB});
+
+// Right Drive
+Motor rDriveF(8);
+Motor rDriveM(9);
+Motor rDriveB(10);
+Motor_Group rDrive({rDriveF, rDriveM, rDriveB});
+Motor flywheel(5);
+Motor intake(6);
 
 void displayScreenText() {
   lv_obj_clean(lv_scr_act());
@@ -66,6 +83,11 @@ void displayScreenText() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
+  lDrive.set_brake_modes(E_MOTOR_BRAKE_COAST);
+  rDrive.set_brake_modes(E_MOTOR_BRAKE_COAST);
+  flywheel.set_brake_mode(E_MOTOR_BRAKE_COAST);
+  lDrive.set_reversed(true);
+  flywheel.set_reversed(true);
   displayScreenText();
 }
 
@@ -82,13 +104,13 @@ void disabled() {}
  * competition-specific initialization routines, such as an autonomous
  * selector on the LCD.
  *
- * This task will exit when the robot is enabled and autonomous or opcontrolc
+ * This task will exit when the robot is enabled and autonomous or opcontrol
  * starts.
  */
 void competition_initialize() {}
 
 void triggerLatch() {
-  static char latch = 'B';
+  static char latch = 'G';
   pros::c::adi_pin_mode(latch, OUTPUT);
   pros::c::adi_digital_write(latch, true);
 }
@@ -111,7 +133,88 @@ void triggerSequencer() {
  * will be stopped. Re-enabling the robot will restart the task, not re-start
  * it from where it left off.
  */
-void autonomous() {}
+
+uint32_t getMsForRotations(motor_gearset_e gearSet, float rotations) {
+  int rpm = 100;
+  if (gearSet == E_MOTOR_GEARSET_36) {
+    rpm = 100;
+  } else if (gearSet == E_MOTOR_GEARSET_18) {
+    rpm = 200;
+  } else if (gearSet == E_MOTOR_GEARSET_06) {
+    rpm = 600;
+  }
+  float rps = rpm / 60;
+  float rpms = rps / 1000;
+  return (rotations / rpms);
+}
+
+void robot(char operation, float rotations) {
+  switch (operation) {
+  case 'm':
+    if (rotations > 0) {
+      rDrive.move(127);
+      lDrive.move(127);
+    } else if (rotations < 0) {
+      rDrive.move(-127);
+      lDrive.move(-127);
+    }
+    break;
+  case 't':
+    if (rotations > 0) {
+      rDrive.move(-127);
+      lDrive.move(127);
+    } else if (rotations < 0) {
+      rDrive.move(127);
+      lDrive.move(-127);
+    }
+    break;
+  case 'r':
+    if (rotations > 0) {
+      rDrive.move(127);
+    } else {
+      rDrive.move(-127);
+    }
+    break;
+  case 'l':
+    if (rotations > 0) {
+      lDrive.move(127);
+    } else {
+      lDrive.move(-127);
+    }
+    break;
+  }
+  delay(getMsForRotations(E_MOTOR_GEARSET_06, std::abs(rotations)));
+  if (operation == 'l') {
+    lDrive.brake();
+  } else if (operation == 'r') {
+    rDrive.brake();
+  } else {
+    rDrive.brake();
+    lDrive.brake();
+  }
+  delay(500);
+}
+
+void autonomous() {
+  flywheel.move(127);
+  delay(3000);
+  triggerSequencer();
+  delay(1500);
+  triggerSequencer();
+  delay(500);
+  flywheel.brake();
+
+  robot('m', 2.5);
+  robot('t', 1.6);
+  robot('m', -3.7);
+  lDrive.move(-127);
+  delay(2000);
+  lDrive.brake();
+  intake.move(-127);
+  delay(700);
+  intake.brake();
+  robot('m', 0.5);
+}
 
 /**
  * Runs the operator control code. This function will be started in its own
@@ -126,30 +229,49 @@ void autonomous() {}
  * operator control task will be stopped. Re-enabling the robot will restart
  * the task, not resume it from where it left off.
  */
-void opcontrol() {
-  // Controller
-  Controller controller(E_CONTROLLER_MASTER);
 
-  // Left Drive
-  Motor lDriveF(1);
-  Motor lDriveM(2);
-  Motor lDriveB(3);
-  Motor_Group lDrive({lDriveF, lDriveM, lDriveB});
-  lDrive.set_reversed(true);
-
-  // Right Drive
-  Motor rDriveF(8);
-  Motor rDriveM(9);
-  Motor rDriveB(10);
-  Motor_Group rDrive({rDriveF, rDriveM, rDriveB});
-
-  // Feature Motors
-  Motor flywheel(5);
+void runFlywheel(void *param) {
   bool flywheelOn = false;
-  flywheel.set_brake_mode(E_MOTOR_BRAKE_COAST);
-  Motor intake(6);
+  int flywheelVolts[2] = {127, 96};
+  int flywheelSpeedSelector = 0;
+  while (true) {
+    if (controller.get_digital_new_press(E_CONTROLLER_DIGITAL_LEFT)) {
+      if (flywheelSpeedSelector == 0) {
+        flywheelSpeedSelector = 1;
+      } else {
+        flywheelSpeedSelector--;
+      }
+    } else if (controller.get_digital_new_press(E_CONTROLLER_DIGITAL_UP)) {
+      if (flywheelSpeedSelector == 1) {
+        flywheelSpeedSelector = 0;
+      } else {
+        flywheelSpeedSelector++;
+      }
+    }
+    if (controller.get_digital_new_press(E_CONTROLLER_DIGITAL_L1)) {
+      flywheelOn = !flywheelOn;
+    }
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_DOWN)) {
+      flywheelOn = false;
+      flywheel.move(-127);
+    }
+    // Emergency Flywheel Reverse
 
-  // Constantly repeat controller inputs
+    if (flywheelOn == true) {
+      flywheel.move(flywheelVolts[flywheelSpeedSelector]);
+
+    } else if (flywheelOn == false &&
+               controller.get_digital(E_CONTROLLER_DIGITAL_DOWN) == false) {
+      flywheel.brake();
+    }
+    delay(20);
+  }
+}
+
+void opcontrol() {
+  task_t flywheelTask =
+      c::task_create(runFlywheel, (void *)"PROS", TASK_PRIORITY_DEFAULT,
+                     TASK_STACK_DEPTH_DEFAULT, "RunFlywheel");
   while (true) {
     // Drive Control
     lDrive.move(controller.get_analog(E_CONTROLLER_ANALOG_LEFT_Y));
@@ -163,26 +285,6 @@ void opcontrol() {
     } else {
       intake.brake();
     }
-
-    if (controller.get_digital_new_press(E_CONTROLLER_DIGITAL_L1)) {
-      if (flywheelOn == false) {
-        flywheelOn = true;
-      } else if (flywheelOn == true) {
-        flywheelOn = false;
-      }
-    }
-    if (controller.get_digital(E_CONTROLLER_DIGITAL_UP)) {
-      flywheelOn = false;
-      flywheel.move(127);
-    }
-    // Emergency Flywheel Reverse
-    if (flywheelOn == true) {
-      flywheel.move(-127);
-    } else if (flywheelOn == false &&
-               controller.get_digital(E_CONTROLLER_DIGITAL_UP) == false) {
-      flywheel.brake();
-    }
-
     // Activate Sequencer
     if (controller.get_digital(E_CONTROLLER_DIGITAL_L2)) {
       triggerSequencer();
@@ -190,7 +292,7 @@ void opcontrol() {
     }
 
     // Trigger End-Of-Match Release
-    if (controller.get_digital(E_CONTROLLER_DIGITAL_DOWN)) {
+    if (controller.get_digital(E_CONTROLLER_DIGITAL_Y)) {
       triggerLatch();
     }
 
